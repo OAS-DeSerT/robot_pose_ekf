@@ -36,15 +36,12 @@
 
 #include <robot_pose_ekf/odom_estimation_node.h>
 
-
 using namespace MatrixWrapper;
 using namespace std;
 using namespace ros;
 using namespace tf;
 
-
 static const double EPS = 1e-5;
-
 
 //#define __EKF_DEBUG_FILE__
 
@@ -78,11 +75,11 @@ namespace estimation
     nh_private.param("base_footprint_frame", base_footprint_frame_, std::string("base_footprint"));
     nh_private.param("sensor_timeout", timeout_, 1.0);
     nh_private.param("odom_used", odom_used_, true);
-    nh_private.param("imu_used",  imu_used_, true);
-    nh_private.param("vo_used",   vo_used_, true);
-    nh_private.param("gps_used",   gps_used_, false);
-    nh_private.param("debug",   debug_, false);
-    nh_private.param("self_diagnose",  self_diagnose_, false);
+    nh_private.param("imu_used", imu_used_, true);
+    nh_private.param("vo_used", vo_used_, true);
+    nh_private.param("gps_used", gps_used_, false);
+    nh_private.param("debug", debug_, false);
+    nh_private.param("self_diagnose", self_diagnose_, false);
     double freq;
     nh_private.param("freq", freq, 30.0);
 
@@ -109,6 +106,7 @@ namespace estimation
     // subscribe to odom messages
     if (odom_used_){
       ROS_DEBUG("Odom sensor can be used");
+      odom_pub_ = nh_private.advertise<nav_msgs::Odometry>("odom_combined_full", 10);
       odom_sub_ = nh.subscribe("odom", 10, &OdomEstimationNode::odomCallback, this);
     }
     else ROS_DEBUG("Odom sensor will NOT be used");
@@ -116,7 +114,7 @@ namespace estimation
     // subscribe to imu messages
     if (imu_used_){
       ROS_DEBUG("Imu sensor can be used");
-      imu_sub_ = nh.subscribe("imu_data", 10,  &OdomEstimationNode::imuCallback, this);
+      imu_sub_ = nh.subscribe("imu_data", 10, &OdomEstimationNode::imuCallback, this);
     }
     else ROS_DEBUG("Imu sensor will NOT be used");
 
@@ -133,7 +131,6 @@ namespace estimation
     }
     else ROS_DEBUG("GPS sensor will NOT be used");
 
-
     // publish state service
     state_srv_ = nh_private.advertiseService("get_status", &OdomEstimationNode::getStatus, this);
 
@@ -144,17 +141,12 @@ namespace estimation
       vo_file_.open("/tmp/vo_file.txt");
       gps_file_.open("/tmp/gps_file.txt");
       corr_file_.open("/tmp/corr_file.txt");
-
-  
     }
   };
 
 
-
-
   // destructor
   OdomEstimationNode::~OdomEstimationNode(){
-
     if (debug_){
       // close files for debugging
       odom_file_.close();
@@ -166,9 +158,6 @@ namespace estimation
   };
 
 
-
-
-
   // callback function for odom data
   void OdomEstimationNode::odomCallback(const OdomConstPtr& odom)
   {
@@ -177,7 +166,8 @@ namespace estimation
     ROS_DEBUG("Odom callback at time %f ", ros::Time::now().toSec());
     assert(odom_used_);
 
-    // receive data 
+    // receive data
+    odom_output_.twist = odom->twist;
     odom_stamp_ = odom->header.stamp;
     odom_time_  = Time::now();
     Quaternion q;
@@ -192,17 +182,17 @@ namespace estimation
     // activate odom
     if (!odom_active_) {
       if (!odom_initializing_){
-	odom_initializing_ = true;
-	odom_init_stamp_ = odom_stamp_;
-	ROS_INFO("Initializing Odom sensor");      
+        odom_initializing_ = true;
+        odom_init_stamp_ = odom_stamp_;
+        ROS_INFO("Initializing Odom sensor");
       }
       if ( filter_stamp_ >= odom_init_stamp_){
-	odom_active_ = true;
-	odom_initializing_ = false;
-	ROS_INFO("Odom sensor activated");      
+        odom_active_ = true;
+        odom_initializing_ = false;
+        ROS_INFO("Odom sensor activated");
       }
       else ROS_DEBUG("Waiting to activate Odom, because Odom measurements are still %f sec in the future.", 
-		    (odom_init_stamp_ - filter_stamp_).toSec());
+        (odom_init_stamp_ - filter_stamp_).toSec());
     }
     
     if (debug_){
@@ -212,8 +202,6 @@ namespace estimation
       odom_file_<< fixed <<setprecision(5) << ros::Time::now().toSec() << " " << odom_meas_.getOrigin().x() << " " << odom_meas_.getOrigin().y() << "  " << yaw << "  " << endl;
     }
   };
-
-
 
 
   // callback function for imu data
@@ -263,17 +251,17 @@ namespace estimation
     // activate imu
     if (!imu_active_) {
       if (!imu_initializing_){
-	imu_initializing_ = true;
-	imu_init_stamp_ = imu_stamp_;
-	ROS_INFO("Initializing Imu sensor");      
+        imu_initializing_ = true;
+        imu_init_stamp_ = imu_stamp_;
+        ROS_INFO("Initializing Imu sensor");
       }
       if ( filter_stamp_ >= imu_init_stamp_){
-	imu_active_ = true;
-	imu_initializing_ = false;
-	ROS_INFO("Imu sensor activated");      
+        imu_active_ = true;
+        imu_initializing_ = false;
+        ROS_INFO("Imu sensor activated");
       }
       else ROS_DEBUG("Waiting to activate IMU, because IMU measurements are still %f sec in the future.", 
-		    (imu_init_stamp_ - filter_stamp_).toSec());
+        (imu_init_stamp_ - filter_stamp_).toSec());
     }
     
     if (debug_){
@@ -283,8 +271,6 @@ namespace estimation
       imu_file_ <<fixed<<setprecision(5)<<ros::Time::now().toSec()<<" "<< yaw << endl;
     }
   };
-
-
 
 
   // callback function for VO data
@@ -306,17 +292,17 @@ namespace estimation
     // activate vo
     if (!vo_active_) {
       if (!vo_initializing_){
-	vo_initializing_ = true;
-	vo_init_stamp_ = vo_stamp_;
-	ROS_INFO("Initializing Vo sensor");      
+        vo_initializing_ = true;
+        vo_init_stamp_ = vo_stamp_;
+        ROS_INFO("Initializing Vo sensor");
       }
       if (filter_stamp_ >= vo_init_stamp_){
-	vo_active_ = true;
-	vo_initializing_ = false;
-	ROS_INFO("Vo sensor activated");      
+        vo_active_ = true;
+        vo_initializing_ = false;
+        ROS_INFO("Vo sensor activated");
       }
       else ROS_DEBUG("Waiting to activate VO, because VO measurements are still %f sec in the future.", 
-		    (vo_init_stamp_ - filter_stamp_).toSec());
+        (vo_init_stamp_ - filter_stamp_).toSec());
     }
     
     if (debug_){
@@ -329,6 +315,7 @@ namespace estimation
   };
 
 
+  // callback function for GPS data
   void OdomEstimationNode::gpsCallback(const GpsConstPtr& gps)
   {
     gps_callback_counter_++;
@@ -355,17 +342,17 @@ namespace estimation
     // activate gps
     if (!gps_active_) {
       if (!gps_initializing_){
-	    gps_initializing_ = true;
-	    gps_init_stamp_ = gps_stamp_;
-	    ROS_INFO("Initializing GPS sensor");      
+        gps_initializing_ = true;
+        gps_init_stamp_ = gps_stamp_;
+        ROS_INFO("Initializing GPS sensor");
       }
       if (filter_stamp_ >= gps_init_stamp_){
-	    gps_active_ = true;
-	    gps_initializing_ = false;
-	    ROS_INFO("GPS sensor activated");      
+        gps_active_ = true;
+        gps_initializing_ = false;
+        ROS_INFO("GPS sensor activated");
       }
       else ROS_DEBUG("Waiting to activate GPS, because GPS measurements are still %f sec in the future.", 
-		    (gps_init_stamp_ - filter_stamp_).toSec());
+        (gps_init_stamp_ - filter_stamp_).toSec());
     }
     
     if (debug_){
@@ -373,7 +360,6 @@ namespace estimation
       gps_file_ <<fixed<<setprecision(5)<<ros::Time::now().toSec()<<" "<< gps_meas_.getOrigin().x() << " " << gps_meas_.getOrigin().y() << " " << gps_meas_.getOrigin().z() <<endl;
     }
   };
-
 
 
   // filter loop
@@ -413,7 +399,6 @@ namespace estimation
       ROS_INFO("GPS sensor not active any more");
     }
 
-    
     // only update filter when one of the sensors is active
     if (odom_active_ || imu_active_ || vo_active_ || gps_active_){
       
@@ -421,9 +406,8 @@ namespace estimation
       if (odom_active_)  filter_stamp_ = min(filter_stamp_, odom_stamp_);
       if (imu_active_)   filter_stamp_ = min(filter_stamp_, imu_stamp_);
       if (vo_active_)    filter_stamp_ = min(filter_stamp_, vo_stamp_);
-      if (gps_active_)  filter_stamp_ = min(filter_stamp_, gps_stamp_);
+      if (gps_active_)   filter_stamp_ = min(filter_stamp_, gps_stamp_);
 
-      
       // update filter
       if ( my_filter_.isInitialized() )  {
         bool diagnostics = true;
@@ -432,6 +416,13 @@ namespace estimation
           // output most recent estimate and relative covariance
           my_filter_.getEstimate(output_);
           pose_pub_.publish(output_);
+          if (odom_used_){
+            odom_output_.header.stamp = output_.header.stamp;
+            odom_output_.header.frame_id = output_.header.frame_id;
+            odom_output_.child_frame_id = base_footprint_frame_;
+            odom_output_.pose = output_.pose;
+            odom_pub_.publish(odom_output_);
+          }
           ekf_sent_counter_++;
           
           // broadcast most recent estimate to TransformArray
@@ -456,24 +447,23 @@ namespace estimation
           ROS_WARN("Robot pose ekf diagnostics discovered a potential problem");
       }
 
-
       // initialize filer with odometry frame
       if (imu_active_ && gps_active_ && !my_filter_.isInitialized()) {
-	Quaternion q = imu_meas_.getRotation();
+        Quaternion q = imu_meas_.getRotation();
         Vector3 p = gps_meas_.getOrigin();
         Transform init_meas_ = Transform(q, p);
         my_filter_.initialize(init_meas_, gps_stamp_);
         ROS_INFO("Kalman filter initialized with gps and imu measurement");
       }	
       else if ( odom_active_ && gps_active_ && !my_filter_.isInitialized()) {
-	Quaternion q = odom_meas_.getRotation();
+        Quaternion q = odom_meas_.getRotation();
         Vector3 p = gps_meas_.getOrigin();
         Transform init_meas_ = Transform(q, p);
         my_filter_.initialize(init_meas_, gps_stamp_);
         ROS_INFO("Kalman filter initialized with gps and odometry measurement");
       }
       else if ( vo_active_ && gps_active_ && !my_filter_.isInitialized()) {
-	Quaternion q = vo_meas_.getRotation();
+        Quaternion q = vo_meas_.getRotation();
         Vector3 p = gps_meas_.getOrigin();
         Transform init_meas_ = Transform(q, p);
         my_filter_.initialize(init_meas_, gps_stamp_);
@@ -527,10 +517,6 @@ bool OdomEstimationNode::getStatus(robot_pose_ekf::GetStatus::Request& req, robo
 }; // namespace
 
 
-
-
-
-
 // ----------
 // -- MAIN --
 // ----------
@@ -544,6 +530,7 @@ int main(int argc, char **argv)
   OdomEstimationNode my_filter_node;
 
   ros::spin();
-  
+
   return 0;
 }
+

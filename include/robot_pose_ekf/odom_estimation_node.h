@@ -105,15 +105,16 @@ private:
 
   ros::NodeHandle node_;
   ros::Timer timer_;
-  ros::Publisher pose_pub_;
-  ros::Subscriber odom_sub_, imu_sub_, vo_sub_,gps_sub_;
+  ros::Publisher pose_pub_, odom_pub_;
+  ros::Subscriber odom_sub_, imu_sub_, vo_sub_, gps_sub_;
   ros::ServiceServer state_srv_;
 
   // ekf filter
   OdomEstimation my_filter_;
 
   // estimated robot pose message to send
-  geometry_msgs::PoseWithCovarianceStamped  output_; 
+  geometry_msgs::PoseWithCovarianceStamped output_;
+  nav_msgs::Odometry odom_output_;
 
   // robot state
   tf::TransformListener    robot_state_;
@@ -139,7 +140,7 @@ private:
   std::ofstream odom_file_, imu_file_, vo_file_, gps_file_, corr_file_, time_file_, extra_file_;
 
   // counters
-  unsigned int odom_callback_counter_, imu_callback_counter_, vo_callback_counter_,gps_callback_counter_, ekf_sent_counter_;
+  unsigned int odom_callback_counter_, imu_callback_counter_, vo_callback_counter_, gps_callback_counter_, ekf_sent_counter_;
 
 }; // class
 

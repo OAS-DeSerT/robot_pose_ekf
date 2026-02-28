@@ -107,7 +107,6 @@ namespace estimation
   };
 
 
-
   // destructor
   OdomEstimation::~OdomEstimation(){
     if (filter_) delete filter_;
@@ -134,8 +133,8 @@ namespace estimation
     SymmetricMatrix prior_Cov(6); 
     for (unsigned int i=1; i<=6; i++) {
       for (unsigned int j=1; j<=6; j++){
-	if (i==j)  prior_Cov(i,j) = pow(0.001,2);
-	else prior_Cov(i,j) = 0;
+        if (i==j)  prior_Cov(i,j) = pow(0.001,2);
+        else prior_Cov(i,j) = 0;
       }
     }
     prior_  = new Gaussian(prior_Mu,prior_Cov);
@@ -152,11 +151,8 @@ namespace estimation
   }
 
 
-
-
-
   // update filter
-  bool OdomEstimation::update(bool odom_active, bool imu_active, bool gps_active, bool vo_active, const Time&  filter_time, bool& diagnostics_res)
+  bool OdomEstimation::update(bool odom_active, bool imu_active, bool gps_active, bool vo_active, const Time& filter_time, bool& diagnostics_res)
   {
     // only update filter when it is initialized
     if (!filter_initialized_){
@@ -173,94 +169,89 @@ namespace estimation
     }
     ROS_DEBUG("Update filter at time %f with dt %f", filter_time.toSec(), dt);
 
-
     // system update filter
     // --------------------
     // for now only add system noise
     ColumnVector vel_desi(2); vel_desi = 0;
     filter_->Update(sys_model_, vel_desi);
 
-    
     // process odom measurement
     // ------------------------
     ROS_DEBUG("Process odom meas");
     if (odom_active){
-      if (!transformer_.canTransform(base_footprint_frame_,"wheelodom", filter_time)){
+      if (!transformer_.canTransform(base_footprint_frame_, "wheelodom", filter_time)){
         ROS_ERROR("filter time older than odom message buffer");
         return false;
       }
       transformer_.lookupTransform("wheelodom", base_footprint_frame_, filter_time, odom_meas_);
       if (odom_initialized_){
-	// convert absolute odom measurements to relative odom measurements in horizontal plane
-	Transform odom_rel_frame =  Transform(tf::createQuaternionFromYaw(filter_estimate_old_vec_(6)), 
-					      filter_estimate_old_.getOrigin()) * odom_meas_old_.inverse() * odom_meas_;
-	ColumnVector odom_rel(6); 
-	decomposeTransform(odom_rel_frame, odom_rel(1), odom_rel(2), odom_rel(3), odom_rel(4), odom_rel(5), odom_rel(6));
-	angleOverflowCorrect(odom_rel(6), filter_estimate_old_vec_(6));
-	// update filter
-	odom_meas_pdf_->AdditiveNoiseSigmaSet(odom_covariance_ * pow(dt,2));
+        // convert absolute odom measurements to relative odom measurements in horizontal plane
+        Transform odom_rel_frame =  Transform(tf::createQuaternionFromYaw(filter_estimate_old_vec_(6)), 
+                                filter_estimate_old_.getOrigin()) * odom_meas_old_.inverse() * odom_meas_;
+        ColumnVector odom_rel(6);
+        decomposeTransform(odom_rel_frame, odom_rel(1), odom_rel(2), odom_rel(3), odom_rel(4), odom_rel(5), odom_rel(6));
+        angleOverflowCorrect(odom_rel(6), filter_estimate_old_vec_(6));
+        // update filter
+        odom_meas_pdf_->AdditiveNoiseSigmaSet(odom_covariance_ * pow(dt,2));
 
         ROS_DEBUG("Update filter with odom measurement %f %f %f %f %f %f", 
                   odom_rel(1), odom_rel(2), odom_rel(3), odom_rel(4), odom_rel(5), odom_rel(6));
-	filter_->Update(odom_meas_model_, odom_rel);
-	diagnostics_odom_rot_rel_ = odom_rel(6);
+        filter_->Update(odom_meas_model_, odom_rel);
+        diagnostics_odom_rot_rel_ = odom_rel(6);
       }
       else{
-	odom_initialized_ = true;
-	diagnostics_odom_rot_rel_ = 0;
+        odom_initialized_ = true;
+        diagnostics_odom_rot_rel_ = 0;
       }
       odom_meas_old_ = odom_meas_;
     }
     // sensor not active
     else odom_initialized_ = false;
 
-    
     // process imu measurement
     // -----------------------
     if (imu_active){
-      if (!transformer_.canTransform(base_footprint_frame_,"imu", filter_time)){
+      if (!transformer_.canTransform(base_footprint_frame_, "imu", filter_time)){
         ROS_ERROR("filter time older than imu message buffer");
         return false;
       }
       transformer_.lookupTransform("imu", base_footprint_frame_, filter_time, imu_meas_);
       if (imu_initialized_){
-	// convert absolute imu yaw measurement to relative imu yaw measurement 
-	Transform imu_rel_frame =  filter_estimate_old_ * imu_meas_old_.inverse() * imu_meas_;
-	ColumnVector imu_rel(3); double tmp;
-	decomposeTransform(imu_rel_frame, tmp, tmp, tmp, tmp, tmp, imu_rel(3));
-	decomposeTransform(imu_meas_,     tmp, tmp, tmp, imu_rel(1), imu_rel(2), tmp);
-	angleOverflowCorrect(imu_rel(3), filter_estimate_old_vec_(6));
-	diagnostics_imu_rot_rel_ = imu_rel(3);
-	// update filter
-	imu_meas_pdf_->AdditiveNoiseSigmaSet(imu_covariance_ * pow(dt,2));
-	filter_->Update(imu_meas_model_,  imu_rel);
+        // convert absolute imu yaw measurement to relative imu yaw measurement 
+        Transform imu_rel_frame =  filter_estimate_old_ * imu_meas_old_.inverse() * imu_meas_;
+        ColumnVector imu_rel(3); double tmp;
+        decomposeTransform(imu_rel_frame, tmp, tmp, tmp, tmp, tmp, imu_rel(3));
+        decomposeTransform(imu_meas_,     tmp, tmp, tmp, imu_rel(1), imu_rel(2), tmp);
+        angleOverflowCorrect(imu_rel(3), filter_estimate_old_vec_(6));
+        diagnostics_imu_rot_rel_ = imu_rel(3);
+        // update filter
+        imu_meas_pdf_->AdditiveNoiseSigmaSet(imu_covariance_ * pow(dt,2));
+        filter_->Update(imu_meas_model_,  imu_rel);
       }
       else{
-	imu_initialized_ = true;
-	diagnostics_imu_rot_rel_ = 0;
+        imu_initialized_ = true;
+        diagnostics_imu_rot_rel_ = 0;
       }
-      imu_meas_old_ = imu_meas_; 
+      imu_meas_old_ = imu_meas_;
     }
     // sensor not active
     else imu_initialized_ = false;
-    
-    
-    
+
     // process vo measurement
     // ----------------------
     if (vo_active){
-      if (!transformer_.canTransform(base_footprint_frame_,"vo", filter_time)){
+      if (!transformer_.canTransform(base_footprint_frame_, "vo", filter_time)){
         ROS_ERROR("filter time older than vo message buffer");
         return false;
       }
       transformer_.lookupTransform("vo", base_footprint_frame_, filter_time, vo_meas_);
       if (vo_initialized_){
-	// convert absolute vo measurements to relative vo measurements
-	Transform vo_rel_frame =  filter_estimate_old_ * vo_meas_old_.inverse() * vo_meas_;
-	ColumnVector vo_rel(6);
-	decomposeTransform(vo_rel_frame, vo_rel(1),  vo_rel(2), vo_rel(3), vo_rel(4), vo_rel(5), vo_rel(6));
-	angleOverflowCorrect(vo_rel(6), filter_estimate_old_vec_(6));
-	// update filter
+        // convert absolute vo measurements to relative vo measurements
+        Transform vo_rel_frame =  filter_estimate_old_ * vo_meas_old_.inverse() * vo_meas_;
+        ColumnVector vo_rel(6);
+        decomposeTransform(vo_rel_frame, vo_rel(1),  vo_rel(2), vo_rel(3), vo_rel(4), vo_rel(5), vo_rel(6));
+        angleOverflowCorrect(vo_rel(6), filter_estimate_old_vec_(6));
+        // update filter
         vo_meas_pdf_->AdditiveNoiseSigmaSet(vo_covariance_ * pow(dt,2));
         filter_->Update(vo_meas_model_,  vo_rel);
       }
@@ -269,13 +260,11 @@ namespace estimation
     }
     // sensor not active
     else vo_initialized_ = false;
-  
-
 
     // process gps measurement
     // ----------------------
     if (gps_active){
-      if (!transformer_.canTransform(base_footprint_frame_,"gps", filter_time)){
+      if (!transformer_.canTransform(base_footprint_frame_, "gps", filter_time)){
         ROS_ERROR("filter time older than gps message buffer");
         return false;
       }
@@ -296,14 +285,12 @@ namespace estimation
     // sensor not active
     else gps_initialized_ = false;
 
-  
-    
     // remember last estimate
     filter_estimate_old_vec_ = filter_->PostGet()->ExpectedValueGet();
     tf::Quaternion q;
     q.setRPY(filter_estimate_old_vec_(4), filter_estimate_old_vec_(5), filter_estimate_old_vec_(6));
     filter_estimate_old_ = Transform(q,
-				     Vector3(filter_estimate_old_vec_(1), filter_estimate_old_vec_(2), filter_estimate_old_vec_(3)));
+                        Vector3(filter_estimate_old_vec_(1), filter_estimate_old_vec_(2), filter_estimate_old_vec_(3)));
     filter_time_old_ = filter_time;
     addMeasurement(StampedTransform(filter_estimate_old_, filter_time, output_frame_, base_footprint_frame_));
 
@@ -312,7 +299,7 @@ namespace estimation
     if (odom_active && imu_active){
       double diagnostics = fabs(diagnostics_odom_rot_rel_ - diagnostics_imu_rot_rel_)/dt;
       if (diagnostics > 0.3 && dt > 0.01){
-	diagnostics_res = false;
+        diagnostics_res = false;
       }
     }
 
@@ -324,7 +311,7 @@ namespace estimation
     ROS_DEBUG("AddMeasurement from %s to %s:  (%f, %f, %f)  (%f, %f, %f, %f)",
               meas.frame_id_.c_str(), meas.child_frame_id_.c_str(),
               meas.getOrigin().x(), meas.getOrigin().y(), meas.getOrigin().z(),
-              meas.getRotation().x(),  meas.getRotation().y(), 
+              meas.getRotation().x(), meas.getRotation().y(), 
               meas.getRotation().z(), meas.getRotation().w());
     transformer_.setTransform( meas );
   }
@@ -347,7 +334,6 @@ namespace estimation
     else ROS_ERROR("Adding a measurement for an unknown sensor %s", meas.child_frame_id_.c_str());
   };
 
-
   // get latest filter posterior as vector
   void OdomEstimation::getEstimate(MatrixWrapper::ColumnVector& estimate)
   {
@@ -358,7 +344,7 @@ namespace estimation
   void OdomEstimation::getEstimate(Time time, Transform& estimate)
   {
     StampedTransform tmp;
-    if (!transformer_.canTransform(base_footprint_frame_,output_frame_, time)){
+    if (!transformer_.canTransform(base_footprint_frame_, output_frame_, time)){
       ROS_ERROR("Cannot get transform at time %f", time.toSec());
       return;
     }
@@ -396,7 +382,7 @@ namespace estimation
     SymmetricMatrix covar =  filter_->PostGet()->CovarianceGet();
     for (unsigned int i=0; i<6; i++)
       for (unsigned int j=0; j<6; j++)
-	estimate.pose.covariance[6*i+j] = covar(i+1,j+1);
+        estimate.pose.covariance[6*i+j] = covar(i+1,j+1);
   };
 
   // correct for angle overflow
@@ -408,28 +394,29 @@ namespace estimation
 
   // decompose Transform into x,y,z,Rx,Ry,Rz
   void OdomEstimation::decomposeTransform(const StampedTransform& trans, 
-					   double& x, double& y, double&z, double&Rx, double& Ry, double& Rz){
-    x = trans.getOrigin().x();   
-    y = trans.getOrigin().y(); 
-    z = trans.getOrigin().z(); 
+                       double& x, double& y, double&z, double&Rx, double& Ry, double& Rz){
+    x = trans.getOrigin().x();
+    y = trans.getOrigin().y();
+    z = trans.getOrigin().z();
     trans.getBasis().getEulerYPR(Rz, Ry, Rx);
   };
 
   // decompose Transform into x,y,z,Rx,Ry,Rz
   void OdomEstimation::decomposeTransform(const Transform& trans, 
-					   double& x, double& y, double&z, double&Rx, double& Ry, double& Rz){
-    x = trans.getOrigin().x();   
-    y = trans.getOrigin().y(); 
-    z = trans.getOrigin().z(); 
+                       double& x, double& y, double&z, double&Rx, double& Ry, double& Rz){
+    x = trans.getOrigin().x();
+    y = trans.getOrigin().y();
+    z = trans.getOrigin().z();
     trans.getBasis().getEulerYPR(Rz, Ry, Rx);
   };
 
   void OdomEstimation::setOutputFrame(const std::string& output_frame){
-	output_frame_ = output_frame;
+    output_frame_ = output_frame;
   };
 
   void OdomEstimation::setBaseFootprintFrame(const std::string& base_frame){
-	base_footprint_frame_ = base_frame;
+    base_footprint_frame_ = base_frame;
   };
 
 }; // namespace
+
